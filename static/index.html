@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight search</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#eef2f6;--card:#fff;--ink:#14213d;--mut:#5b6b82;--line:#d6dee8;--acc:#0a6cff;--acc-ink:#fff;--ok:#0b7a4b;--band:#14213d;--band-ink:#fff;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0e1522;--card:#17213a;--ink:#e8eefc;--mut:#98a6c2;--line:#2a3856;--acc:#5b9dff;--acc-ink:#07142c;--ok:#4ad08f;--band:#0a101c;--band-ink:#e8eefc;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif}
+header{background:var(--band);color:var(--band-ink);padding:28px 20px 90px}
+.wrap{max-width:980px;margin:0 auto}
+h1{margin:0;font-size:28px;font-weight:700;letter-spacing:-.02em}
+header p{margin:4px 0 0;opacity:.7}
+form{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:-62px auto 20px;max-width:980px;display:grid;gap:12px;grid-template-columns:repeat(12,1fr);box-shadow:0 10px 30px rgba(10,20,40,.12)}
+label{display:grid;gap:4px;font-size:13px;color:var(--mut);font-weight:500}
+input,select,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0;width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.c3{grid-column:span 3}.c2{grid-column:span 2}.c4{grid-column:span 4}.c12{grid-column:span 12}
+.swap{align-self:end;grid-column:span 1;cursor:pointer;font-size:18px;padding:9px 0}
+.go{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600;cursor:pointer}
+.go:disabled{opacity:.6;cursor:wait}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px;color:var(--mut)}
+.bar select{width:auto}
+.chips{display:flex;gap:6px}
+.chips button{width:auto;cursor:pointer;border-radius:99px;padding:5px 12px;font-size:13px}
+.chips button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.res{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto}
+.main{padding:14px 16px;display:grid;gap:10px}
+.leg{display:grid;grid-template-columns:130px 1fr 90px;gap:12px;align-items:center}
+.al{font-size:13px;color:var(--mut);line-height:1.3}.al b{color:var(--ink);display:block;font-weight:600}
+.tl{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.t{font-size:18px;font-weight:600}.t small{display:block;font-size:12px;color:var(--mut);font-weight:500}
+.line{height:2px;background:var(--line);position:relative}
+.line span{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--card);padding:0 8px;font-size:12px;color:var(--mut);white-space:nowrap}
+.stp{font-size:13px;text-align:right;color:var(--mut)}.stp.nz{color:var(--ink)}
+.price{border-left:1px dashed var(--line);padding:14px 20px;display:grid;align-content:center;justify-items:end;gap:2px}
+.price b{font-size:24px;color:var(--ok)}.price span{font-size:12px;color:var(--mut)}
+.msg{padding:28px;text-align:center;color:var(--mut)}.err{color:#d33}
+@media(max-width:720px){form>*{grid-column:span 12!important}.swap{display:none}.leg{grid-template-columns:1fr}.res{grid-template-columns:1fr}.price{border-left:0;border-top:1px dashed var(--line);justify-items:start}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Find a flight</h1><p>Live fares from Google Flights, via fli.</p></div></header>
+<main class="wrap">
+<form id="f">
+ <label class="c4">From<input id="o" list="ap" value="BOM" required autocomplete="off" maxlength="3"></label>
+ <button type="button" class="swap" id="sw" aria-label="Swap airports">⇄</button>
+ <label class="c4">To<input id="d" list="ap" value="DEL" required autocomplete="off" maxlength="3"></label>
+ <label class="c3">Depart<input id="dd" type="date" required></label>
+ <label class="c3">Return (optional)<input id="rd" type="date"></label>
+ <label class="c2">Adults<input id="ad" type="number" min="1" max="9" value="1"></label>
+ <label class="c2">Children<input id="ch" type="number" min="0" max="8" value="0"></label>
+ <label class="c3">Cabin<select id="seat"><option value="economy">Economy</option><option value="premium">Premium economy</option><option value="business">Business</option><option value="first">First</option></select></label>
+ <label class="c2">Currency<select id="cur"><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option></select></label>
+ <label class="c2">Stops<select id="st"><option value="any">Any</option><option value="0">Nonstop</option><option value="1">1 or fewer</option><option value="2">2 or fewer</option></select></label>
+ <button class="go c3" id="go" style="align-self:end">Search flights</button>
+ <datalist id="ap"></datalist>
+ <div class="c12" id="hint" style="font-size:13px;color:var(--mut)"></div>
+</form>
+<div id="bar" class="bar" hidden>
+ <span id="count"></span>
+ <label style="display:flex;gap:6px;align-items:center">Sort <select id="sort"><option value="price">Cheapest</option><option value="duration">Shortest</option><option value="departure">Earliest</option></select></label>
+ <div class="chips" id="chips"></div>
+</div>
+<div id="out"><div class="msg">Choose your route and dates to see fares.</div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let cur="INR",data=[],names={},maxStops="all";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const tm=iso=>new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+const dt=iso=>new Date(iso).toLocaleDateString([],{day:"numeric",month:"short"});
+const dur=m=>m?`${Math.floor(m/60)}h ${m%60}m`:"";
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const d0=new Date();d0.setDate(d0.getDate()+14);$("dd").value=ymd(d0);$("dd").min=$("rd").min=ymd(new Date());
+$("dd").onchange=()=>{$("rd").min=$("dd").value||ymd(new Date())};
+
+fetch("/api/airports").then(r=>r.json()).then(a=>{
+ $("ap").innerHTML=a.map(x=>{names[x.code]=x.name;return `<option value="${esc(x.code)}">${esc(x.name)}</option>`}).join("");
+ hint();
+}).catch(()=>{});
+function hint(){$("hint").textContent=[$("o").value,$("d").value].map(c=>names[c.toUpperCase()]||"").filter(Boolean).join("  →  ")}
+$("o").oninput=$("d").oninput=hint;
+$("sw").onclick=()=>{[$("o").value,$("d").value]=[$("d").value,$("o").value];hint()};
+
+function legRow(f){
+ const a=f.legs[0],z=f.legs[f.legs.length-1];
+ const via=f.legs.slice(0,-1).map(l=>l.to).join(", ");
+ const air=[...new Set(f.legs.map(l=>l.airline))].join(", ");
+ return `<div class="leg">
+  <div class="al"><b>${esc(air)}</b>${esc(f.legs.map(l=>l.airline_code+l.flight_number).join(" · "))}</div>
+  <div class="tl"><div class="t">${tm(a.depart)}<small>${esc(a.from)} · ${dt(a.depart)}</small></div>
+   <div class="line"><span>${dur(f.duration)}</span></div>
+   <div class="t">${tm(z.arrive)}<small>${esc(z.to)} · ${dt(z.arrive)}</small></div></div>
+  <div class="stp ${f.stops?"nz":""}">${f.stops?f.stops+(f.stops>1?" stops":" stop")+"<br>"+esc(via):"Nonstop"}</div></div>`;
+}
+function render(){
+ let r=data.filter(x=>maxStops==="all"||x.stops<=+maxStops);
+ const s=$("sort").value;
+ const num=v=>v==null?Infinity:v;  // unknown values sort last
+ const totDur=x=>x.duration==null?null:x.duration+(x.return?x.return.duration??0:0);
+ r.sort((a,b)=>s==="price"?num(a.price)-num(b.price)||0:s==="duration"?num(totDur(a))-num(totDur(b))||0:new Date(a.legs[0].depart)-new Date(b.legs[0].depart));
+ $("count").textContent=`${r.length} of ${data.length} flights`;
+ $("out").innerHTML=r.length?r.map(x=>`<article class="res"><div class="main">${legRow(x)}${x.return?legRow(x.return):""}</div>
+  <div class="price"><b>${x.price!=null?new Intl.NumberFormat([],{style:"currency",currency:cur,maximumFractionDigits:0}).format(x.price):"—"}</b><span>${x.return?"round trip":"per person"}</span></div></article>`).join(""):`<div class="msg">No flights match these filters. Try allowing more stops.</div>`;
+}
+function chips(){
+ const opts=[["all","Any stops"],["0","Nonstop"],["1","1 stop max"]];
+ $("chips").innerHTML=opts.map(([v,t])=>`<button type="button" data-v="${v}" aria-pressed="${maxStops===v}">${t}</button>`).join("");
+}
+$("chips").onclick=e=>{const v=e.target.dataset.v;if(v){maxStops=v;chips();render()}};
+$("sort").onchange=render;chips();
+
+$("f").onsubmit=async e=>{
+ e.preventDefault();$("go").disabled=true;$("go").textContent="Searching…";
+ $("out").innerHTML='<div class="msg">Searching fares…</div>';$("bar").hidden=true;
+ try{
+  const res=await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+   origin:$("o").value,destination:$("d").value,depart_date:$("dd").value,return_date:$("rd").value||null,
+   currency:$("cur").value,adults:$("ad").value,children:$("ch").value,seat:$("seat").value,stops:$("st").value})});
+  const j=await res.json().catch(()=>({error:`Server error (HTTP ${res.status}). Check the server log.`}));
+  if(!res.ok)throw new Error(j.error||"Search failed");
+  cur=$("cur").value;data=j.results;maxStops="all";chips();$("bar").hidden=!data.length;
+  data.length?render():$("out").innerHTML='<div class="msg">No flights found for those dates. Try nearby dates or another route.</div>';
+ }catch(err){$("out").innerHTML=`<div class="msg err">${esc(err.message)}</div>`}
+ $("go").disabled=false;$("go").textContent="Search flights";
+};
+</script>
+</body>
+</html>
