@@ -34,16 +34,11 @@ Port 5001 must be free (`sudo ss -ltnp | grep 5001`). If it isn't, change it in 
 
 ## 3. Add it to nginx
 
-Find the config for appsstore.io:
+The appsstore.io server block includes every file in `/etc/nginx/appsstore-apps/`,
+so each app gets its own file and the main config is never edited:
 
 ```bash
-grep -rl "appsstore.io" /etc/nginx/sites-enabled/ /etc/nginx/conf.d/
-```
-
-Paste the contents of `deploy/nginx-searchflights.conf` inside its `server { ... }` block
-(the one with `listen 443`), next to the existing `/flythedge/` location. Then:
-
-```bash
+sudo cp deploy/nginx-searchflights.conf /etc/nginx/appsstore-apps/searchflights.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
