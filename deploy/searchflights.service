@@ -1,0 +1,13 @@
+[Unit]
+Description=Search Flights (fli) web app
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/fli-flights
+ExecStart=/var/www/fli-flights/venv/bin/gunicorn --workers 2 --timeout 120 --bind 127.0.0.1:5001 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

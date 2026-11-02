@@ -1,2 +1,3 @@
 flights @ git+https://github.com/punitarani/fli.git@881aee5ff4321e81ea2157cb44be94ce6a21dc1b  # 0.10.0, not yet on PyPI
 flask==3.1.3
+gunicorn==23.0.0

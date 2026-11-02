@@ -78,7 +78,7 @@ const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${Str
 const d0=new Date();d0.setDate(d0.getDate()+14);$("dd").value=ymd(d0);$("dd").min=$("rd").min=ymd(new Date());
 $("dd").onchange=()=>{$("rd").min=$("dd").value||ymd(new Date())};
 
-fetch("/api/airports").then(r=>r.json()).then(a=>{
+fetch("api/airports").then(r=>r.json()).then(a=>{
  $("ap").innerHTML=a.map(x=>{names[x.code]=x.name;return `<option value="${esc(x.code)}">${esc(x.name)}</option>`}).join("");
  hint();
 }).catch(()=>{});
@@ -118,7 +118,7 @@ $("f").onsubmit=async e=>{
  e.preventDefault();$("go").disabled=true;$("go").textContent="Searching…";
  $("out").innerHTML='<div class="msg">Searching fares…</div>';$("bar").hidden=true;
  try{
-  const res=await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+  const res=await fetch("api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
    origin:$("o").value,destination:$("d").value,depart_date:$("dd").value,return_date:$("rd").value||null,
    currency:$("cur").value,adults:$("ad").value,children:$("ch").value,seat:$("seat").value,stops:$("st").value})});
   const j=await res.json().catch(()=>({error:`Server error (HTTP ${res.status}). Check the server log.`}));
