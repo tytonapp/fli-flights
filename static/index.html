@@ -38,6 +38,12 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .stp{font-size:13px;text-align:right;color:var(--mut)}.stp.nz{color:var(--ink)}
 .price{border-left:1px dashed var(--line);padding:14px 20px;display:grid;align-content:center;justify-items:end;gap:2px}
 .price b{font-size:24px;color:var(--ok)}.price span{font-size:12px;color:var(--mut)}
+.ac{position:relative}
+.menu{position:absolute;top:100%;left:0;right:0;z-index:10;margin:4px 0 0;padding:4px;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(10,20,40,.18);max-height:320px;overflow:auto}
+.menu li{padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--ink);font-size:14px;line-height:1.3}
+.menu li small{display:block;color:var(--mut);font-size:12px}
+.menu li[aria-selected=true]{background:var(--bg)}
+.menu .code{float:right;font-weight:600;color:var(--mut)}
 .msg{padding:28px;text-align:center;color:var(--mut)}.err{color:#d33}
 @media(max-width:720px){form>*{grid-column:span 12!important}.swap{display:none}.leg{grid-template-columns:1fr}.res{grid-template-columns:1fr}.price{border-left:0;border-top:1px dashed var(--line);justify-items:start}}
 </style>
@@ -46,9 +52,9 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 <header><div class="wrap"><h1>Find a flight</h1><p>Live fares from Google Flights, via fli.</p></div></header>
 <main class="wrap">
 <form id="f">
- <label class="c4">From<input id="o" list="ap" value="BOM" required autocomplete="off" maxlength="3"></label>
+ <label class="c4 ac">From<input id="o" value="BOM" data-code="BOM" required autocomplete="off" placeholder="City, airport or code" role="combobox" aria-expanded="false" aria-autocomplete="list"></label>
  <button type="button" class="swap" id="sw" aria-label="Swap airports">⇄</button>
- <label class="c4">To<input id="d" list="ap" value="DEL" required autocomplete="off" maxlength="3"></label>
+ <label class="c4 ac">To<input id="d" value="DEL" data-code="DEL" required autocomplete="off" placeholder="City, airport or code" role="combobox" aria-expanded="false" aria-autocomplete="list"></label>
  <label class="c3">Depart<input id="dd" type="date" required></label>
  <label class="c3">Return (optional)<input id="rd" type="date"></label>
  <label class="c2">Adults<input id="ad" type="number" min="1" max="9" value="1"></label>
@@ -57,7 +63,6 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
  <label class="c2">Currency<select id="cur"><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option><option>AED</option></select></label>
  <label class="c2">Stops<select id="st"><option value="any">Any</option><option value="0">Nonstop</option><option value="1">1 or fewer</option><option value="2">2 or fewer</option></select></label>
  <button class="go c3" id="go" style="align-self:end">Search flights</button>
- <datalist id="ap"></datalist>
  <div class="c12" id="hint" style="font-size:13px;color:var(--mut)"></div>
 </form>
 <div id="bar" class="bar" hidden>
@@ -69,7 +74,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let cur="INR",data=[],names={},maxStops="all";
+let cur="INR",data=[],maxStops="all";
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const tm=iso=>new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 const dt=iso=>new Date(iso).toLocaleDateString([],{day:"numeric",month:"short"});
@@ -78,13 +83,65 @@ const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${Str
 const d0=new Date();d0.setDate(d0.getDate()+14);$("dd").value=ymd(d0);$("dd").min=$("rd").min=ymd(new Date());
 $("dd").onchange=()=>{$("rd").min=$("dd").value||ymd(new Date())};
 
-fetch("api/airports").then(r=>r.json()).then(a=>{
- $("ap").innerHTML=a.map(x=>{names[x.code]=x.name;return `<option value="${esc(x.code)}">${esc(x.name)}</option>`}).join("");
+// Airport autocomplete: match by code, city, alternate city names or airport name.
+let airports=[];const byCode={};
+const region=(()=>{try{return new Intl.DisplayNames(["en"],{type:"region"})}catch{return null}})();
+const country=c=>{try{return c&&region?region.of(c):c}catch{return c}};
+const norm=t=>String(t||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const show=a=>a.city?`${a.city} (${a.code})`:`${a.name} (${a.code})`;
+fetch("api/airports").then(r=>r.json()).then(list=>{
+ airports=list.map(a=>({...a,_city:norm(a.city),_aka:norm(a.aka).split(/,\s*/).filter(Boolean),_name:norm(a.name)}));
+ airports.forEach(a=>byCode[a.code]=a);
+ ["o","d"].forEach(id=>{const a=byCode[$(id).dataset.code];if(a)$(id).value=show(a)});
  hint();
 }).catch(()=>{});
-function hint(){$("hint").textContent=[$("o").value,$("d").value].map(c=>names[c.toUpperCase()]||"").filter(Boolean).join("  →  ")}
-$("o").oninput=$("d").oninput=hint;
-$("sw").onclick=()=>{[$("o").value,$("d").value]=[$("d").value,$("o").value];hint()};
+function score(a,q){
+ if(a.code.toLowerCase()===q)return 100;
+ if(a._city===q)return 95;
+ if(a._city.startsWith(q))return 90;
+ if(a._aka.some(k=>k===q))return 88;
+ if(a._aka.some(k=>k.startsWith(q)))return 85;
+ const words=a._name.split(/[\s-]+/);
+ if(words.some(w=>w.startsWith(q)))return 70;
+ if(a._city.includes(q)||a._name.includes(q)||a._aka.some(k=>k.includes(q)))return 50;
+ return 0;
+}
+function matches(text){
+ const q=norm(text).trim();if(!q)return[];
+ return airports.map(a=>[score(a,q),a]).filter(x=>x[0]).sort((x,y)=>y[0]-x[0]||x[1].city.length-y[1].city.length).slice(0,8).map(x=>x[1]);
+}
+function resolve(input){  // code for what's typed: picked option, a bare code, or the single best match
+ if(input.dataset.code)return input.dataset.code;
+ const t=input.value.trim().toUpperCase(),m=t.match(/\(([A-Z0-9]{3})\)$/);
+ if(byCode[m?m[1]:t])return m?m[1]:t;
+ const best=matches(input.value)[0];return best?best.code:"";
+}
+function hint(){$("hint").textContent=["o","d"].map(id=>{const a=byCode[$(id).dataset.code];return a?`${a.name}${a.country?", "+country(a.country):""}`:""}).filter(Boolean).join("  →  ")}
+function setupAc(input){
+ const menu=document.createElement("ul");menu.className="menu";menu.id=input.id+"-menu";menu.setAttribute("role","listbox");menu.hidden=true;
+ input.setAttribute("aria-controls",menu.id);input.after(menu);
+ let items=[],active=-1;
+ const close=()=>{menu.hidden=true;input.setAttribute("aria-expanded","false");active=-1};
+ const pick=a=>{input.value=show(a);input.dataset.code=a.code;close();hint()};
+ const paint=()=>{menu.querySelectorAll("li").forEach((li,i)=>li.setAttribute("aria-selected",i===active))};
+ const open=()=>{
+  items=matches(input.value);active=items.length?0:-1;
+  menu.innerHTML=items.map((a,i)=>`<li role="option" data-i="${i}"><span class="code">${esc(a.code)}</span>${esc(a.city||a.name)}<small>${esc(a.name)}${a.country?", "+esc(country(a.country)):""}</small></li>`).join("");
+  menu.hidden=!items.length;input.setAttribute("aria-expanded",String(!!items.length));paint();
+ };
+ input.addEventListener("input",()=>{delete input.dataset.code;open();hint()});
+ input.addEventListener("focus",()=>input.select());
+ input.addEventListener("keydown",e=>{
+  if(menu.hidden)return;
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();active=(active+(e.key==="ArrowDown"?1:-1)+items.length)%items.length;paint();menu.children[active]?.scrollIntoView({block:"nearest"})}
+  else if(e.key==="Enter"&&active>=0){e.preventDefault();pick(items[active])}
+  else if(e.key==="Escape")close();
+ });
+ input.addEventListener("blur",()=>setTimeout(()=>{if(!input.dataset.code){const c=resolve(input);if(byCode[c])pick(byCode[c])}close()},150));
+ menu.addEventListener("mousedown",e=>{e.preventDefault();const li=e.target.closest("li");if(li)pick(items[+li.dataset.i])});
+}
+setupAc($("o"));setupAc($("d"));
+$("sw").onclick=()=>{const o=$("o"),d=$("d");[o.value,d.value]=[d.value,o.value];const [oc,dc]=[o.dataset.code,d.dataset.code];for(const [x,c] of [[o,dc],[d,oc]])c?x.dataset.code=c:delete x.dataset.code;hint()};
 
 function legRow(f){
  const a=f.legs[0],z=f.legs[f.legs.length-1];
@@ -119,7 +176,7 @@ $("f").onsubmit=async e=>{
  $("out").innerHTML='<div class="msg">Searching fares…</div>';$("bar").hidden=true;
  try{
   const res=await fetch("api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   origin:$("o").value,destination:$("d").value,depart_date:$("dd").value,return_date:$("rd").value||null,
+   origin:resolve($("o")),destination:resolve($("d")),depart_date:$("dd").value,return_date:$("rd").value||null,
    currency:$("cur").value,adults:$("ad").value,children:$("ch").value,seat:$("seat").value,stops:$("st").value})});
   const j=await res.json().catch(()=>({error:`Server error (HTTP ${res.status}). Check the server log.`}));
   if(!res.ok)throw new Error(j.error||"Search failed");

@@ -14,6 +14,14 @@ Then open http://localhost:5000.
 
 `requirements.txt` installs `flights` from a pinned GitHub commit, so Git must be installed.
 
+## Airport city names
+
+Airport search matches city names and alternate names (Kochi/Cochin, Bengaluru/Bangalore) using
+`airport_cities.json`, built from the public-domain [OurAirports](https://ourairports.com/data/) data.
+To refresh it, download
+[airports.csv](https://davidmegginson.github.io/ourairports-data/airports.csv) and run
+`python build_cities.py airports.csv`.
+
 ## Troubleshooting
 
 - `python check.py` runs one search directly through fli, without the web app.

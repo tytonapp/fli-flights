@@ -1,8 +1,10 @@
 """Flight search UI backed by punitarani/fli (pip package: `flights`).
 Run:  pip install -r requirements.txt && python app.py  ->  http://localhost:5000
 """
+import json
 import re
 from datetime import date
+from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from pydantic import ValidationError
 from fli.models import (Airport, FlightSearchFilters, FlightSegment, MaxStops,
@@ -14,6 +16,10 @@ from fli.search.exceptions import (SearchConnectionError, SearchHTTPError,
 from fli.search.flights import SearchParseError
 
 app = Flask(__name__, static_folder="static")
+
+# {code: [city, country, aliases]} from OurAirports; rebuild with build_cities.py
+CITIES_FILE = Path(__file__).with_name("airport_cities.json")
+CITIES = json.loads(CITIES_FILE.read_text(encoding="utf-8")) if CITIES_FILE.exists() else {}
 
 SEATS = {"economy": SeatType.ECONOMY, "premium": SeatType.PREMIUM_ECONOMY,
          "business": SeatType.BUSINESS, "first": SeatType.FIRST}
@@ -67,7 +73,14 @@ def index():
 
 @app.get("/api/airports")
 def airports():
-    return jsonify([{"code": code(a), "name": label(a)} for a in Airport])
+    out = []
+    for a in Airport:
+        c = code(a)
+        city, country, aka = CITIES.get(c, ("", "", ""))
+        out.append({"code": c, "name": label(a), "city": city, "country": country, "aka": aka})
+    resp = jsonify(out)
+    resp.cache_control.public, resp.cache_control.max_age = True, 86400
+    return resp
 
 
 class BadRequest(ValueError):
